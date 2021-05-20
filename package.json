@@ -1,0 +1,11 @@
+{
+  "name": "arb-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "<davidfloyd91> <<davidfloyd91@gmail.com>>",
+  "license": "MIT",
+  "dependencies": {
+    "web3": "^1.3.5"
+  },
+  "type": "module"
+}
