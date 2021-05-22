@@ -1,4 +1,4 @@
-export default [
+module.exports = [
   {
     inputs: [
       { internalType: "address", name: "_feeToSetter", type: "address" },

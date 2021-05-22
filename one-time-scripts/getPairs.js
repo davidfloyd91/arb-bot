@@ -1,8 +1,8 @@
-import Web3 from "web3";
-import fs from "fs";
+const Web3 = require("web3");
+const fs = require("fs");
 
-import tokenList from "../uniswapDefaultTokenList.js";
-import uniswapV2FactoryAbi from "../abis/uniswapV2Factory.js";
+const tokenList = require("../uniswapDefaultTokenList.js");
+const uniswapV2FactoryAbi = require("../abis/uniswapV2Factory.js");
 
 const { WEB3_INFURA_PROJECT_ID } = process.env;
 
@@ -65,7 +65,7 @@ const go = () => {
             try {
               fs.writeFileSync(
                 "pairs.js",
-                `export default ${JSON.stringify(pairs)}`,
+                `module.exports = ${JSON.stringify(pairs)}`,
                 "utf-8"
               );
             } catch (err) {

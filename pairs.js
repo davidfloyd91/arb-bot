@@ -1,4 +1,4 @@
-export default [
+module.exports = [
   {
     tokenA: "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9",
     tokenB: "0x6B175474E89094C44Da98b954EedeAC495271d0F",

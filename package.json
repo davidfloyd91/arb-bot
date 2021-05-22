@@ -7,5 +7,7 @@
   "dependencies": {
     "web3": "^1.3.5"
   },
-  "type": "module"
+  "scripts": {
+    "start": "node go.js"
+  }
 }

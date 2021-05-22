@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   name: "Uniswap Default List",
   timestamp: "2021-01-21T23:57:10.982Z",
   version: {
