@@ -30,7 +30,7 @@ const wsProvider = new WebsocketProvider(wsUrl, wsOptions);
 const web3 = new Web3(wsProvider);
 
 const {
-  eth: { Contract, /* getBlockNumber, */ getGasPrice },
+  eth: { Contract, getGasPrice },
   utils: { fromWei },
 } = web3;
 
@@ -67,54 +67,6 @@ setInterval(async () => {
   getReadableGasPrice();
 }, 30 * 1000);
 
-// const getOlderTokenSwaps = ({ blockNumber, pairContract, token0, token1 }) => {
-//   pairContract.getPastEvents(
-//     "Swap",
-//     { fromBlock: blockNumber - 4 * 60 * 12 },
-//     (err, events) => {
-//       if (err) {
-//         console.log("d300d84a8eb0951ab978039af34e4f67", { err });
-//       } else {
-//         let zeroToOneSwap, oneToZeroSwap;
-
-//         for (const event of events) {
-//           const _swap = formatSwap({ res: event, token0, token1, isOld: true });
-//           const { amount0In, amount1In } = _swap || {};
-
-//           if (amount0In > 0) {
-//             zeroToOneSwap = _swap;
-//           } else if (amount1In > 0) {
-//             oneToZeroSwap = _swap;
-//           }
-//         }
-
-//         if (zeroToOneSwap) {
-//           if (mostRecentSwaps[token0]) {
-//             mostRecentSwaps[token0][token1] = zeroToOneSwap;
-//           } else {
-//             mostRecentSwaps[token0] = { [token1]: zeroToOneSwap };
-//           }
-//         }
-
-//         if (oneToZeroSwap) {
-//           if (mostRecentSwaps[token1]) {
-//             mostRecentSwaps[token1][token0] = oneToZeroSwap;
-//           } else {
-//             mostRecentSwaps[token1] = { [token0]: oneToZeroSwap };
-//           }
-//         }
-
-//         writeMostRecentSwapsToFile();
-//       }
-
-//       if (pendingPastEventCalls.length > 1) {
-//         pendingPastEventCalls = pendingPastEventCalls.slice(1);
-//         getOlderTokenSwaps(pendingPastEventCalls[0]);
-//       }
-//     }
-//   );
-// };
-
 let mostRecentSwaps = {
   /*
     [token0]: {
@@ -125,7 +77,7 @@ let mostRecentSwaps = {
   */
 };
 
-const formatSwap = ({ res, token0, token1, isOld = false }) => {
+const formatSwap = ({ res, token0, token1 }) => {
   const { address, blockHash, blockNumber, returnValues, transactionHash } =
     res || {};
   const { amount0In, amount1In, amount0Out, amount1Out } = returnValues || {};
@@ -140,7 +92,6 @@ const formatSwap = ({ res, token0, token1, isOld = false }) => {
     blockNumber,
     transactionHash,
     gasPrice,
-    isOld,
     token0,
     token1,
   };
@@ -257,6 +208,7 @@ const isTriangularArbOpp = ({ zeroToOne, oneToTwo, twoToZero }) => {
     twoToZero,
   });
 
+  const GAS_PRICE_THRESHOLD = 40;
   const SWAP_AGE_THRESHOLD = 10;
   const ROUND_TRIP_RATE_THRESHOLD = 1.2;
 
@@ -265,13 +217,19 @@ const isTriangularArbOpp = ({ zeroToOne, oneToTwo, twoToZero }) => {
     return false;
   }
 
+  let tooOld = false;
+  let tooExpensive = false;
+
+  if (zeroToOne.gasPrice > 40) {
+    tooExpensive = true;
+  }
+
   if (
     currentBlockNumber - SWAP_AGE_THRESHOLD > zeroToOne.blockNumber ||
     currentBlockNumber - SWAP_AGE_THRESHOLD > oneToTwo.blockNumber ||
     currentBlockNumber - SWAP_AGE_THRESHOLD > twoToZero.blockNumber
   ) {
-    console.log("one or more swaps is too old");
-    return false;
+    tooOld = true;
   }
 
   const [zeroToOneAmountIn, zeroToOneAmountOut, zeroToOneDirection] =
@@ -319,35 +277,23 @@ const isTriangularArbOpp = ({ zeroToOne, oneToTwo, twoToZero }) => {
   const roundTripRate =
     zeroToOneExchangeRate * oneToTwoExchangeRate * twoToZeroExchangeRate;
 
-  const isArbOpp = roundTripRate > ROUND_TRIP_RATE_THRESHOLD;
+  // TODO: bail earlier if tooOld or tooExpensive -- want to watch for now
+  const isArbOpp =
+    roundTripRate > ROUND_TRIP_RATE_THRESHOLD && !tooOld && !tooExpensive;
 
   console.log({
     isArbOpp,
     roundTripRate,
+    ROUND_TRIP_RATE_THRESHOLD,
+    tooOld,
+    tooExpensive,
     zeroToOneExchangeRate,
     oneToTwoExchangeRate,
     twoToZeroExchangeRate,
-    ROUND_TRIP_RATE_THRESHOLD,
   });
 
   return isArbOpp;
 };
-
-// const _getBlockNumber = async () => {
-//   let blockNumber;
-
-//   await getBlockNumber((err, res) => {
-//     if (err) {
-//       process.exit(1);
-//     } else {
-//       blockNumber = res;
-//     }
-//   });
-
-//   return blockNumber;
-// };
-
-let pendingPastEventCalls = [];
 
 const go = async () => {
   const mostRecentSwapsFileExists = fs.existsSync(mostRecentSwapsFilename);
@@ -355,8 +301,6 @@ const go = async () => {
   if (mostRecentSwapsFileExists) {
     mostRecentSwaps = require(path.resolve(mostRecentSwapsFilename));
   }
-
-  // const blockNumber = await _getBlockNumber();
 
   await getReadableGasPrice();
 
@@ -389,17 +333,6 @@ const go = async () => {
       .catch((err) => console.log("093547cee5726047869efa655ac5e6e1", { err }));
 
     pairTokens[pairAddress] = { token0, token1 };
-
-    // pendingPastEventCalls.push({ blockNumber, pairContract, token0, token1 });
-  }
-
-  if (pendingPastEventCalls.length) {
-    getOlderTokenSwaps(pendingPastEventCalls[0]);
-  }
-
-  for (const _pair of pairs) {
-    const { pair: pairAddress } = _pair;
-    const pairContract = new Contract(uniswapPairAbi, pairAddress);
 
     pairContract.events.Swap((err, res) => {
       if (err) {
