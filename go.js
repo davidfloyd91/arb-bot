@@ -10,6 +10,12 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const RIGHT = "right";
 const LEFT = "left";
 
+const {
+  GAS_PRICE_THRESHOLD = 40,
+  SWAP_AGE_THRESHOLD = 16,
+  ROUND_TRIP_RATE_THRESHOLD = 1.04,
+} = require("./config.js");
+
 const { WEB3_INFURA_PROJECT_ID } = process.env;
 const wsUrl = `wss://mainnet.infura.io/ws/v3/${WEB3_INFURA_PROJECT_ID}`;
 
@@ -44,6 +50,11 @@ const date = utcDate < 10 ? `0${utcDate}` : utcDate;
 const mostRecentSwapsFilename = path.join(
   __dirname,
   `most-recent-swaps/${year}-${month}-${date}-most-recent-swaps.js`
+);
+
+const logsFilename = path.join(
+  __dirname,
+  `logs/${year}-${month}-${date}-logs.txt`
 );
 
 let gasPrice;
@@ -202,16 +213,6 @@ const getSwapExchangeRate = ({ amountIn, amountOut, tokenIn, tokenOut }) => {
 };
 
 const isTriangularArbOpp = ({ zeroToOne, oneToTwo, twoToZero }) => {
-  console.log({
-    zeroToOne,
-    oneToTwo,
-    twoToZero,
-  });
-
-  const GAS_PRICE_THRESHOLD = 40;
-  const SWAP_AGE_THRESHOLD = 10;
-  const ROUND_TRIP_RATE_THRESHOLD = 1.2;
-
   if (!zeroToOne || !oneToTwo || !twoToZero) {
     console.log("your business is all undefined friend");
     return false;
@@ -220,7 +221,7 @@ const isTriangularArbOpp = ({ zeroToOne, oneToTwo, twoToZero }) => {
   let tooOld = false;
   let tooExpensive = false;
 
-  if (zeroToOne.gasPrice > 40) {
+  if (zeroToOne.gasPrice > GAS_PRICE_THRESHOLD) {
     tooExpensive = true;
   }
 
@@ -281,18 +282,54 @@ const isTriangularArbOpp = ({ zeroToOne, oneToTwo, twoToZero }) => {
   const isArbOpp =
     roundTripRate > ROUND_TRIP_RATE_THRESHOLD && !tooOld && !tooExpensive;
 
-  console.log({
+  const newLogEntry = {
+    time: new Date(),
     isArbOpp,
     roundTripRate,
     ROUND_TRIP_RATE_THRESHOLD,
     tooOld,
+    SWAP_AGE_THRESHOLD,
     tooExpensive,
+    GAS_PRICE_THRESHOLD,
     zeroToOneExchangeRate,
     oneToTwoExchangeRate,
     twoToZeroExchangeRate,
-  });
+    zeroToOne,
+    oneToTwo,
+    twoToZero,
+  };
+
+  logArbCalcs({ newLogEntry });
 
   return isArbOpp;
+};
+
+const logArbCalcs = ({ newLogEntry }) => {
+  setTimeout(() => {
+    console.log(newLogEntry);
+
+    const stringifiedNewLogEntry = `${JSON.stringify(
+      newLogEntry,
+      null,
+      2
+    )}\n===========\n`;
+
+    const logsFileExists = fs.existsSync(logsFilename);
+
+    if (logsFileExists) {
+      fs.appendFileSync(logsFilename, stringifiedNewLogEntry, (err) => {
+        if (err) {
+          console.log("d34fce835a640873b0c3ba51b55b96ae", { err });
+        }
+      });
+    } else {
+      fs.writeFileSync(logsFilename, stringifiedNewLogEntry, (err) => {
+        if (err) {
+          console.log("d34fce835a640873b0c3ba51b55b96ae", { err });
+        }
+      });
+    }
+  }, 0);
 };
 
 const go = async () => {

@@ -2,3 +2,5 @@ node_modules
 notes
 most-recent-swaps/*
 !most-recent-swaps/.gitkeep
+logs/*
+!logs/.gitkeep
